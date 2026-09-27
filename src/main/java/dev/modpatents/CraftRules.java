@@ -1,4 +1,4 @@
-package dev.craftlock;
+package dev.modpatents;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -29,18 +29,18 @@ import java.util.regex.Pattern;
 public final class CraftRules {
     private static final long MESSAGE_COOLDOWN_MS = 1500;
 
-    private static CraftRules current = new CraftRules(new CraftLockConfig());
+    private static CraftRules current = new CraftRules(new PatentsConfig());
     private static boolean lastLoadFailed = false;
     private static final Map<UUID, Long> lastMessageAt = new HashMap<>();
 
-    private final CraftLockConfig config;
+    private final PatentsConfig config;
     private final List<Predicate<ItemStack>> alwaysAllowed;
     private final List<Predicate<ItemStack>> blockedForAll;
     private final Set<String> bypass = new HashSet<>();
     /** Chave: nome em minúsculas ou UUID. */
     private final Map<String, List<Predicate<ItemStack>>> perPlayer = new HashMap<>();
 
-    private CraftRules(CraftLockConfig config) {
+    private CraftRules(PatentsConfig config) {
         this.config = config;
         this.alwaysAllowed = compileAll(config.alwaysAllowed);
         this.blockedForAll = compileAll(config.blockedForAll);
@@ -50,7 +50,7 @@ public final class CraftRules {
 
     // ---------------------------------------------------------------- estado global
 
-    public static CraftLockConfig config() {
+    public static PatentsConfig config() {
         return current.config;
     }
 
@@ -61,19 +61,19 @@ public final class CraftRules {
     /** Relê o JSON do disco. Se estiver inválido, mantém as regras anteriores e devolve a mensagem de erro. */
     public static String reload() {
         try {
-            apply(CraftLockConfig.loadOrCreate());
+            apply(PatentsConfig.loadOrCreate());
             lastLoadFailed = false;
-            CraftLock.LOGGER.info("[CraftLock] Config carregado: {} jogador(es)", current.perPlayer.size());
+            ModPatents.LOGGER.info("[ModPatents] Config carregado: {} jogador(es)", current.perPlayer.size());
             return null;
         } catch (Exception e) {
             lastLoadFailed = true;
-            CraftLock.LOGGER.error("[CraftLock] Erro lendo {}: mantendo as regras anteriores", CraftLockConfig.path(), e);
+            ModPatents.LOGGER.error("[ModPatents] Erro lendo {}: mantendo as regras anteriores", PatentsConfig.path(), e);
             return e.getMessage();
         }
     }
 
     /** Aplica um config já em memória (usado pelos comandos e pelos testes). */
-    public static void apply(CraftLockConfig config) {
+    public static void apply(PatentsConfig config) {
         current = new CraftRules(config);
     }
 
@@ -139,12 +139,12 @@ public final class CraftRules {
         lastMessageAt.put(player.getUUID(), now);
 
         String modId = BuiltInRegistries.ITEM.getKey(result.getItem()).getNamespace();
-        String modName = CraftLockConfig.displayName(modId);
+        String modName = PatentsConfig.displayName(modId);
         String text = current.config.blockedMessage
                 .replace("{mod}", modName)
                 .replace("{item}", result.getHoverName().getString());
         player.displayClientMessage(Component.literal(text).withStyle(ChatFormatting.RED), true);
-        CraftLock.LOGGER.info("[CraftLock] {} tentou craftar {} ({}) e foi bloqueado",
+        ModPatents.LOGGER.info("[ModPatents] {} tentou craftar {} ({}) e foi bloqueado",
                 player.getGameProfile().getName(), BuiltInRegistries.ITEM.getKey(result.getItem()), modName);
     }
 
@@ -179,7 +179,7 @@ public final class CraftRules {
         if (entry.startsWith("#")) {
             ResourceLocation tagId = ResourceLocation.tryParse(entry.substring(1));
             if (tagId == null) {
-                CraftLock.LOGGER.warn("[CraftLock] Tag inválida ignorada: {}", raw);
+                ModPatents.LOGGER.warn("[ModPatents] Tag inválida ignorada: {}", raw);
                 return null;
             }
             TagKey<Item> tag = TagKey.create(Registries.ITEM, tagId);

@@ -1,7 +1,7 @@
-package dev.craftlock.mixin;
+package dev.modpatents.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-import dev.craftlock.CraftRules;
+import dev.modpatents.CraftRules;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.ItemCombinerMenu;
@@ -21,7 +21,7 @@ public abstract class SmithingMenuMixin extends ItemCombinerMenu {
     @ModifyExpressionValue(
             method = "createResult",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/crafting/SmithingRecipe;assemble(Lnet/minecraft/world/item/crafting/RecipeInput;Lnet/minecraft/core/HolderLookup$Provider;)Lnet/minecraft/world/item/ItemStack;"))
-    private ItemStack craftlock$filterResult(ItemStack result) {
+    private ItemStack modpatents$filterResult(ItemStack result) {
         return CraftRules.filter(this.player, result);
     }
 }

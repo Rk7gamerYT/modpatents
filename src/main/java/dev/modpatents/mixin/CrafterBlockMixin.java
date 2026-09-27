@@ -1,7 +1,7 @@
-package dev.craftlock.mixin;
+package dev.modpatents.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-import dev.craftlock.CraftRules;
+import dev.modpatents.CraftRules;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.CrafterBlock;
 import org.spongepowered.asm.mixin.Mixin;
@@ -13,7 +13,7 @@ public abstract class CrafterBlockMixin {
     @ModifyExpressionValue(
             method = "dispenseFrom",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/crafting/CraftingRecipe;assemble(Lnet/minecraft/world/item/crafting/RecipeInput;Lnet/minecraft/core/HolderLookup$Provider;)Lnet/minecraft/world/item/ItemStack;"))
-    private ItemStack craftlock$filterResult(ItemStack result) {
+    private ItemStack modpatents$filterResult(ItemStack result) {
         return CraftRules.filterAutomated(result);
     }
 }

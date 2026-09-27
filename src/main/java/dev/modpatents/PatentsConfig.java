@@ -1,4 +1,4 @@
-package dev.craftlock;
+package dev.modpatents;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Conteúdo do config/craftlock.json.
+ * Conteúdo do config/modpatents.json.
  *
  * Cada entrada de lista pode ser:
  *   "create"        -> todos os itens do mod create
@@ -27,7 +27,7 @@ import java.util.TreeMap;
  *   "create:wrench" -> um item específico ("create:*_casing" também funciona)
  *   "#c:ingots"     -> todos os itens de uma tag
  */
-public final class CraftLockConfig {
+public final class PatentsConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
     @SerializedName("sempre_liberados")
@@ -51,11 +51,11 @@ public final class CraftLockConfig {
     public Map<String, List<String>> players = new LinkedHashMap<>();
 
     public static Path path() {
-        return FMLPaths.CONFIGDIR.get().resolve("craftlock.json");
+        return FMLPaths.CONFIGDIR.get().resolve("modpatents.json");
     }
 
-    public static CraftLockConfig createDefault() {
-        CraftLockConfig config = new CraftLockConfig();
+    public static PatentsConfig createDefault() {
+        PatentsConfig config = new PatentsConfig();
         for (int i = 1; i <= 6; i++) {
             config.players.put("Jogador" + i, new ArrayList<>());
         }
@@ -63,16 +63,16 @@ public final class CraftLockConfig {
     }
 
     /** Lê o arquivo; se não existir, cria um modelo. Lança exceção se o JSON estiver inválido. */
-    public static CraftLockConfig loadOrCreate() throws IOException {
+    public static PatentsConfig loadOrCreate() throws IOException {
         Path path = path();
         if (Files.notExists(path)) {
-            CraftLockConfig config = createDefault();
+            PatentsConfig config = createDefault();
             config.save();
-            CraftLock.LOGGER.info("[CraftLock] Criado arquivo modelo em {}", path);
+            ModPatents.LOGGER.info("[ModPatents] Criado arquivo modelo em {}", path);
             return config;
         }
         String json = Files.readString(path, StandardCharsets.UTF_8);
-        CraftLockConfig config = GSON.fromJson(json, CraftLockConfig.class);
+        PatentsConfig config = GSON.fromJson(json, PatentsConfig.class);
         if (config == null) {
             throw new IOException("arquivo vazio");
         }
@@ -92,13 +92,13 @@ public final class CraftLockConfig {
         if (alwaysAllowed == null) alwaysAllowed = new ArrayList<>();
         if (blockedForAll == null) blockedForAll = new ArrayList<>();
         if (bypass == null) bypass = new ArrayList<>();
-        if (blockedMessage == null) blockedMessage = new CraftLockConfig().blockedMessage;
+        if (blockedMessage == null) blockedMessage = new PatentsConfig().blockedMessage;
         if (players == null) players = new LinkedHashMap<>();
         players.replaceAll((name, entries) -> entries == null ? new ArrayList<>() : new ArrayList<>(entries));
     }
 
     /**
-     * Escreve config/craftlock_mods_disponiveis.txt com todos os ids de mod que têm itens,
+     * Escreve config/modpatents_mods_disponiveis.txt com todos os ids de mod que têm itens,
      * pra facilitar o preenchimento do JSON.
      */
     public static void writeAvailableModsFile() {
@@ -108,17 +108,17 @@ public final class CraftLockConfig {
         }
 
         StringBuilder out = new StringBuilder();
-        out.append("# Gerado automaticamente pelo CraftLock toda vez que o servidor abre.\n");
-        out.append("# Use o id (primeira coluna) no config/craftlock.json.\n");
+        out.append("# Gerado automaticamente pelo Mod Patents toda vez que o servidor abre.\n");
+        out.append("# Use o id (primeira coluna) no config/modpatents.json.\n");
         out.append("# Dica: \"mekanism*\" pega mekanism, mekanismgenerators, mekanismtools...\n\n");
         itemCounts.forEach((modId, count) -> out.append(String.format("%-32s %-40s %d itens%n",
                 modId, displayName(modId), count)));
 
-        Path path = FMLPaths.CONFIGDIR.get().resolve("craftlock_mods_disponiveis.txt");
+        Path path = FMLPaths.CONFIGDIR.get().resolve("modpatents_mods_disponiveis.txt");
         try {
             Files.writeString(path, out.toString(), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            CraftLock.LOGGER.warn("[CraftLock] Não consegui escrever {}", path, e);
+            ModPatents.LOGGER.warn("[ModPatents] Não consegui escrever {}", path, e);
         }
     }
 

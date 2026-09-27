@@ -1,8 +1,8 @@
-package dev.craftlock.mixin;
+package dev.modpatents.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
-import dev.craftlock.CraftRules;
+import dev.modpatents.CraftRules;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.item.ItemStack;
@@ -15,7 +15,7 @@ public abstract class CraftingMenuMixin {
     @ModifyExpressionValue(
             method = "slotChangedCraftingGrid",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/crafting/CraftingRecipe;assemble(Lnet/minecraft/world/item/crafting/RecipeInput;Lnet/minecraft/core/HolderLookup$Provider;)Lnet/minecraft/world/item/ItemStack;"))
-    private static ItemStack craftlock$filterResult(ItemStack result, @Local(argsOnly = true) Player player) {
+    private static ItemStack modpatents$filterResult(ItemStack result, @Local(argsOnly = true) Player player) {
         return CraftRules.filter(player, result);
     }
 }

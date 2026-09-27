@@ -1,16 +1,16 @@
 modLoader="javafml"
 loaderVersion="${loader_version_range}"
 license="${mod_license}"
-issueTrackerURL="https://github.com/Rk7gamerYT/craftlock/issues"
+issueTrackerURL="https://github.com/Rk7gamerYT/modpatents/issues"
 
 [[mods]]
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 authors="Rk7gamerYT"
-displayURL="https://github.com/Rk7gamerYT/craftlock"
+displayURL="https://github.com/Rk7gamerYT/modpatents"
 description='''
-Bloqueia crafts de itens de mods por jogador, configurado em config/craftlock.json.
+Bloqueia crafts de itens de mods por jogador, configurado em config/modpatents.json.
 Só precisa estar instalado no servidor.
 '''
 # Mod só de servidor: clientes sem o mod podem entrar normalmente

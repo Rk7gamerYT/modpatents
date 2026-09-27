@@ -1,7 +1,7 @@
-package dev.craftlock.mixin;
+package dev.modpatents.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-import dev.craftlock.CraftRules;
+import dev.modpatents.CraftRules;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ContainerLevelAccess;
@@ -17,17 +17,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(StonecutterMenu.class)
 public abstract class StonecutterMenuMixin {
     @Unique
-    private Player craftlock$player;
+    private Player modpatents$player;
 
     @Inject(method = "<init>(ILnet/minecraft/world/entity/player/Inventory;Lnet/minecraft/world/inventory/ContainerLevelAccess;)V", at = @At("RETURN"))
-    private void craftlock$capturePlayer(int containerId, Inventory inventory, ContainerLevelAccess access, CallbackInfo ci) {
-        this.craftlock$player = inventory.player;
+    private void modpatents$capturePlayer(int containerId, Inventory inventory, ContainerLevelAccess access, CallbackInfo ci) {
+        this.modpatents$player = inventory.player;
     }
 
     @ModifyExpressionValue(
             method = "setupResultSlot",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/crafting/StonecutterRecipe;assemble(Lnet/minecraft/world/item/crafting/SingleRecipeInput;Lnet/minecraft/core/HolderLookup$Provider;)Lnet/minecraft/world/item/ItemStack;"))
-    private ItemStack craftlock$filterResult(ItemStack result) {
-        return CraftRules.filter(this.craftlock$player, result);
+    private ItemStack modpatents$filterResult(ItemStack result) {
+        return CraftRules.filter(this.modpatents$player, result);
     }
 }

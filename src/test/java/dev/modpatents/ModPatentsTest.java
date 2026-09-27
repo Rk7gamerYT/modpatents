@@ -1,4 +1,4 @@
-package dev.craftlock;
+package dev.modpatents;
 
 import com.mojang.authlib.GameProfile;
 import net.minecraft.core.BlockPos;
@@ -32,11 +32,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * sempre_liberados pra simular "item de um mod que o jogador não tem".
  */
 @ExtendWith(EphemeralTestServerProvider.class)
-class CraftLockTest {
+class ModPatentsTest {
     private static final GameProfile TESTER = new GameProfile(UUID.fromString("00000000-0000-0000-0000-00000000abcd"), "Tester");
 
-    private static CraftLockConfig config(String... testerEntries) {
-        CraftLockConfig config = new CraftLockConfig();
+    private static PatentsConfig config(String... testerEntries) {
+        PatentsConfig config = new PatentsConfig();
         config.alwaysAllowed = new ArrayList<>();
         config.players.put("TESTER", new ArrayList<>(List.of(testerEntries))); // maiúsculas de propósito
         return config;
@@ -143,7 +143,7 @@ class CraftLockTest {
     @Test
     void outroJogadorNaoHerdaPermissao(MinecraftServer server) {
         onServer(server, () -> {
-            CraftLockConfig config = config();
+            PatentsConfig config = config();
             config.players.put("OutroCara", new ArrayList<>(List.of("minecraft")));
             CraftRules.apply(config);
             assertTrue(craftInTable(server, LOG).isEmpty());
@@ -153,7 +153,7 @@ class CraftLockTest {
     @Test
     void permissaoPorUuid(MinecraftServer server) {
         onServer(server, () -> {
-            CraftLockConfig config = config();
+            PatentsConfig config = config();
             config.players.put(TESTER.getId().toString(), new ArrayList<>(List.of("minecraft")));
             CraftRules.apply(config);
             assertEquals(Items.OAK_PLANKS, craftInTable(server, LOG).getItem());
@@ -163,7 +163,7 @@ class CraftLockTest {
     @Test
     void bypassEBloqueioGlobal(MinecraftServer server) {
         onServer(server, () -> {
-            CraftLockConfig config = config();
+            PatentsConfig config = config();
             config.bypass.add("tester");
             CraftRules.apply(config);
             assertEquals(Items.OAK_PLANKS, craftInTable(server, LOG).getItem());
@@ -212,7 +212,7 @@ class CraftLockTest {
     @Test
     void crafterAutomatico(MinecraftServer server) {
         onServer(server, () -> {
-            CraftLockConfig config = config();
+            PatentsConfig config = config();
             CraftRules.apply(config);
             assertTrue(CraftRules.filterAutomated(PLANKS.copy()).isEmpty(), "nada liberado -> crafter não faz");
 
@@ -224,6 +224,22 @@ class CraftLockTest {
             config.alwaysAllowed.clear();
             CraftRules.apply(config);
             assertEquals(Items.OAK_PLANKS, CraftRules.filterAutomated(PLANKS.copy()).getItem());
+        });
+    }
+
+    @Test
+    void comandosLiberarERemover(MinecraftServer server) {
+        onServer(server, () -> {
+            CraftRules.apply(config());
+            var source = server.createCommandSourceStack();
+            server.getCommands().performPrefixedCommand(source, "patents liberar Tester minecraft");
+            assertEquals(Items.OAK_PLANKS, craftInTable(server, LOG).getItem(), "/patents liberar");
+
+            server.getCommands().performPrefixedCommand(source, "patentes remover tester minecraft");
+            assertTrue(craftInTable(server, LOG).isEmpty(), "/patentes remover (apelido)");
+
+            server.getCommands().performPrefixedCommand(source, "patents liberar NovoJogador create*");
+            assertEquals(List.of("create*"), CraftRules.config().players.get("NovoJogador"));
         });
     }
 }
