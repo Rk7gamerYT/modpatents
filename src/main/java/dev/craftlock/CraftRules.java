@@ -1,0 +1,208 @@
+package dev.craftlock;
+
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+
+/**
+ * Versão "compilada" do config, usada nas checagens de craft.
+ * Todo acesso acontece na thread do servidor.
+ */
+public final class CraftRules {
+    private static final long MESSAGE_COOLDOWN_MS = 1500;
+
+    private static CraftRules current = new CraftRules(new CraftLockConfig());
+    private static boolean lastLoadFailed = false;
+    private static final Map<UUID, Long> lastMessageAt = new HashMap<>();
+
+    private final CraftLockConfig config;
+    private final List<Predicate<ItemStack>> alwaysAllowed;
+    private final List<Predicate<ItemStack>> blockedForAll;
+    private final Set<String> bypass = new HashSet<>();
+    /** Chave: nome em minúsculas ou UUID. */
+    private final Map<String, List<Predicate<ItemStack>>> perPlayer = new HashMap<>();
+
+    private CraftRules(CraftLockConfig config) {
+        this.config = config;
+        this.alwaysAllowed = compileAll(config.alwaysAllowed);
+        this.blockedForAll = compileAll(config.blockedForAll);
+        config.bypass.forEach(name -> bypass.add(normalize(name)));
+        config.players.forEach((name, entries) -> perPlayer.put(normalize(name), compileAll(entries)));
+    }
+
+    // ---------------------------------------------------------------- estado global
+
+    public static CraftLockConfig config() {
+        return current.config;
+    }
+
+    public static boolean lastLoadFailed() {
+        return lastLoadFailed;
+    }
+
+    /** Relê o JSON do disco. Se estiver inválido, mantém as regras anteriores e devolve a mensagem de erro. */
+    public static String reload() {
+        try {
+            apply(CraftLockConfig.loadOrCreate());
+            lastLoadFailed = false;
+            CraftLock.LOGGER.info("[CraftLock] Config carregado: {} jogador(es)", current.perPlayer.size());
+            return null;
+        } catch (Exception e) {
+            lastLoadFailed = true;
+            CraftLock.LOGGER.error("[CraftLock] Erro lendo {}: mantendo as regras anteriores", CraftLockConfig.path(), e);
+            return e.getMessage();
+        }
+    }
+
+    /** Aplica um config já em memória (usado pelos comandos e pelos testes). */
+    public static void apply(CraftLockConfig config) {
+        current = new CraftRules(config);
+    }
+
+    // ---------------------------------------------------------------- checagens
+
+    public static boolean canCraft(String playerName, UUID playerId, ItemStack result) {
+        CraftRules rules = current;
+        String name = normalize(playerName);
+        String id = playerId.toString();
+
+        if (result.isEmpty() || rules.bypass.contains(name) || rules.bypass.contains(id)) {
+            return true;
+        }
+        if (matchesAny(rules.blockedForAll, result)) {
+            return false;
+        }
+        if (matchesAny(rules.alwaysAllowed, result)) {
+            return true;
+        }
+        // o jogador pode aparecer pelo nome e/ou pelo UUID; vale a soma dos dois
+        return matchesAny(rules.perPlayer.getOrDefault(name, List.of()), result)
+                || matchesAny(rules.perPlayer.getOrDefault(id, List.of()), result);
+    }
+
+    /** Crafts sem jogador (Crafter do vanilla). */
+    public static boolean canCraftAutomated(ItemStack result) {
+        CraftRules rules = current;
+        if (result.isEmpty()) {
+            return true;
+        }
+        if (matchesAny(rules.blockedForAll, result)) {
+            return false;
+        }
+        return !rules.config.crafterBlocksModItems || matchesAny(rules.alwaysAllowed, result);
+    }
+
+    /**
+     * Usado pelos mixins: devolve o resultado original se o jogador pode craftar,
+     * ou ItemStack.EMPTY (e avisa o jogador) se não pode.
+     * No cliente não faz nada; quem manda é o servidor.
+     */
+    public static ItemStack filter(Player player, ItemStack result) {
+        if (!(player instanceof ServerPlayer serverPlayer) || result.isEmpty()) {
+            return result;
+        }
+        if (canCraft(serverPlayer.getGameProfile().getName(), serverPlayer.getUUID(), result)) {
+            return result;
+        }
+        notifyBlocked(serverPlayer, result);
+        return ItemStack.EMPTY;
+    }
+
+    public static ItemStack filterAutomated(ItemStack result) {
+        return canCraftAutomated(result) ? result : ItemStack.EMPTY;
+    }
+
+    private static void notifyBlocked(ServerPlayer player, ItemStack result) {
+        long now = System.currentTimeMillis();
+        Long last = lastMessageAt.get(player.getUUID());
+        if (last != null && now - last < MESSAGE_COOLDOWN_MS) {
+            return;
+        }
+        lastMessageAt.put(player.getUUID(), now);
+
+        String modId = BuiltInRegistries.ITEM.getKey(result.getItem()).getNamespace();
+        String modName = CraftLockConfig.displayName(modId);
+        String text = current.config.blockedMessage
+                .replace("{mod}", modName)
+                .replace("{item}", result.getHoverName().getString());
+        player.displayClientMessage(Component.literal(text).withStyle(ChatFormatting.RED), true);
+        CraftLock.LOGGER.info("[CraftLock] {} tentou craftar {} ({}) e foi bloqueado",
+                player.getGameProfile().getName(), BuiltInRegistries.ITEM.getKey(result.getItem()), modName);
+    }
+
+    // ---------------------------------------------------------------- compilação das entradas
+
+    private static boolean matchesAny(List<Predicate<ItemStack>> predicates, ItemStack stack) {
+        for (Predicate<ItemStack> predicate : predicates) {
+            if (predicate.test(stack)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Predicate<ItemStack>> compileAll(List<String> entries) {
+        List<Predicate<ItemStack>> out = new ArrayList<>();
+        for (String entry : entries) {
+            Predicate<ItemStack> predicate = compile(entry);
+            if (predicate != null) {
+                out.add(predicate);
+            }
+        }
+        return out;
+    }
+
+    private static Predicate<ItemStack> compile(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String entry = raw.trim().toLowerCase(Locale.ROOT);
+
+        if (entry.startsWith("#")) {
+            ResourceLocation tagId = ResourceLocation.tryParse(entry.substring(1));
+            if (tagId == null) {
+                CraftLock.LOGGER.warn("[CraftLock] Tag inválida ignorada: {}", raw);
+                return null;
+            }
+            TagKey<Item> tag = TagKey.create(Registries.ITEM, tagId);
+            return stack -> stack.is(tag);
+        }
+
+        Pattern pattern = glob(entry);
+        if (entry.contains(":")) {
+            return stack -> pattern.matcher(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString()).matches();
+        }
+        return stack -> pattern.matcher(BuiltInRegistries.ITEM.getKey(stack.getItem()).getNamespace()).matches();
+    }
+
+    /** "mekanism*" -> mekanism seguido de qualquer coisa; o resto é literal. */
+    private static Pattern glob(String text) {
+        List<String> parts = new ArrayList<>();
+        for (String part : text.split("\\*", -1)) {
+            parts.add(Pattern.quote(part));
+        }
+        return Pattern.compile(String.join(".*", parts));
+    }
+
+    static String normalize(String name) {
+        return name.trim().toLowerCase(Locale.ROOT);
+    }
+}

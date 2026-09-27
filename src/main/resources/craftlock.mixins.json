@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.craftlock.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CraftingMenuMixin",
+    "SmithingMenuMixin",
+    "StonecutterMenuMixin",
+    "CrafterBlockMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
