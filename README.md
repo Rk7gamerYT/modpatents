@@ -1,3 +1,5 @@
+<img src="art/logo.png" width="128" align="right" alt="Logo do Mod Patents">
+
 # Mod Patents (NeoForge 1.21.1)
 
 [![Build](https://github.com/Rk7gamerYT/modpatents/actions/workflows/build.yml/badge.svg)](https://github.com/Rk7gamerYT/modpatents/actions/workflows/build.yml)
@@ -62,6 +64,8 @@ O que conta é o **item que sai do craft**, não o nome da receita.
 Mechanical Crafter do Create, etc.). Use `bloqueados_para_todos` para fechar brechas específicas.
 
 ## Desenvolvimento
+A logo é gerada por `python art/make_logo.py` (precisa do Pillow).
+
 ```
 ./gradlew build   # compila e roda os testes (sobem um servidor Minecraft de verdade)
 ```

@@ -7,6 +7,7 @@ issueTrackerURL="https://github.com/Rk7gamerYT/modpatents/issues"
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
+logoFile="modpatents_logo.png"
 authors="Rk7gamerYT"
 displayURL="https://github.com/Rk7gamerYT/modpatents"
 description='''
