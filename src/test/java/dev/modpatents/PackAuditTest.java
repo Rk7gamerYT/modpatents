@@ -14,7 +14,6 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ShapedRecipe;
-import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.testframework.junit.EphemeralTestServerProvider;
 import org.junit.jupiter.api.Assumptions;
@@ -43,12 +42,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PackAuditTest {
     private static final GameProfile TESTER = new GameProfile(UUID.fromString("00000000-0000-0000-0000-00000000beef"), "Auditor");
 
+    /** Só audita se houver itens de outros mods registrados (no CI não há, e o teste é pulado). */
     private static void assumePackMods() {
-        long thirdParty = ModList.get().getMods().stream()
-                .map(m -> m.getModId())
-                .filter(id -> !List.of("minecraft", "neoforge", "modpatents").contains(id))
-                .count();
-        Assumptions.assumeTrue(thirdParty > 0, "sem mods do pack em build/minecraft-junit/mods");
+        boolean hasModItems = BuiltInRegistries.ITEM.keySet().stream()
+                .map(key -> key.getNamespace())
+                .anyMatch(ns -> !List.of("minecraft", "neoforge", "modpatents", "testframework").contains(ns));
+        Assumptions.assumeTrue(hasModItems, "sem mods do pack em build/minecraft-junit/mods");
     }
 
     private static void onServer(MinecraftServer server, Runnable body) {
