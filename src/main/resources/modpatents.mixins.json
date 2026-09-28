@@ -7,7 +7,9 @@
     "CraftingMenuMixin",
     "SmithingMenuMixin",
     "StonecutterMenuMixin",
-    "CrafterBlockMixin"
+    "CrafterBlockMixin",
+    "CraftingRecipeResultMixin",
+    "ModRecipeResultMixin"
   ],
   "injectors": {
     "defaultRequire": 1

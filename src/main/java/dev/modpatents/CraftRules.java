@@ -5,11 +5,13 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +34,8 @@ public final class CraftRules {
     private static CraftRules current = new CraftRules(new PatentsConfig());
     private static boolean lastLoadFailed = false;
     private static final Map<UUID, Long> lastMessageAt = new HashMap<>();
+    /** Jogador cujo craft na bancada/inventário está sendo processado agora (os mixins dos menus cuidam dele). */
+    private static final ThreadLocal<Player> playerCraft = new ThreadLocal<>();
 
     private final PatentsConfig config;
     private final List<Predicate<ItemStack>> alwaysAllowed;
@@ -98,7 +102,7 @@ public final class CraftRules {
                 || matchesAny(rules.perPlayer.getOrDefault(id, List.of()), result);
     }
 
-    /** Crafts sem jogador (Crafter do vanilla). */
+    /** Crafts sem jogador: Crafter do vanilla, autocraft e grades de craft de outros mods. */
     public static boolean canCraftAutomated(ItemStack result) {
         CraftRules rules = current;
         if (result.isEmpty()) {
@@ -107,7 +111,7 @@ public final class CraftRules {
         if (matchesAny(rules.blockedForAll, result)) {
             return false;
         }
-        return !rules.config.crafterBlocksModItems || matchesAny(rules.alwaysAllowed, result);
+        return !rules.config.autocraftBlocksModItems || matchesAny(rules.alwaysAllowed, result);
     }
 
     /**
@@ -128,6 +132,38 @@ public final class CraftRules {
 
     public static ItemStack filterAutomated(ItemStack result) {
         return canCraftAutomated(result) ? result : ItemStack.EMPTY;
+    }
+
+    /** Marca que o código a seguir é um craft de jogador na bancada/inventário. Devolve o valor anterior para restaurar. */
+    public static Player enterPlayerCraft(Player player) {
+        Player previous = playerCraft.get();
+        playerCraft.set(player);
+        return previous;
+    }
+
+    public static void exitPlayerCraft(Player previous) {
+        if (previous == null) {
+            playerCraft.remove();
+        } else {
+            playerCraft.set(previous);
+        }
+    }
+
+    /**
+     * Chamado toda vez que uma receita de craft (shaped/shapeless) monta o resultado, venha de onde vier.
+     * Se não é um craft de jogador na bancada, é autocraft ou a grade de algum outro mod: vale a regra de autocraft.
+     */
+    public static ItemStack filterRecipeResult(ItemStack result) {
+        if (result.isEmpty() || playerCraft.get() != null || !isServerThread()) {
+            return result;
+        }
+        return filterAutomated(result);
+    }
+
+    /** Só o servidor aplica regras; no singleplayer o cliente roda em outra thread e não é afetado. */
+    private static boolean isServerThread() {
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        return server != null && server.isSameThread();
     }
 
     private static void notifyBlocked(ServerPlayer player, ItemStack result) {

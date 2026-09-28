@@ -25,7 +25,7 @@ Feito para séries de Minecraft em que cada jogador tem a **patente** de alguns 
   "sempre_liberados": ["minecraft", "#c:ingots"],
   "bloqueados_para_todos": [],
   "ignoram_bloqueio": ["NomeDoAdmin"],
-  "crafter_bloqueia_itens_de_mod": true,
+  "autocraft_bloqueia_itens_de_mod": true,
   "mensagem_bloqueio": "Você não tem permissão pra craftar itens de {mod}!",
   "jogadores": {
     "Kaua":    ["create*"],
@@ -55,15 +55,33 @@ O que conta é o **item que sai do craft**, não o nome da receita.
 - `/patents testar <jogador>`: diz se o jogador pode craftar o item na sua mão
 
 ## O que é bloqueado
+**Craft de jogador** (usa as patentes de cada um):
 - Craft 2x2 do inventário e mesa de craft (inclusive via livro de receitas)
 - Mesa de ferraria e cortador de pedras
-- Crafter (autocraft vanilla): não tem jogador, então só faz itens de `sempre_liberados`
-  (desligue com `"crafter_bloqueia_itens_de_mod": false`)
 
-**Não cobre (ainda):** mesas e autocraft próprios de outros mods (AE2, Refined Storage,
-Mechanical Crafter do Create, etc.). Use `bloqueados_para_todos` para fechar brechas específicas.
+**Qualquer outro craft** (só faz itens de `sempre_liberados`):
+- Crafter do vanilla
+- Autocraft de outros mods: AE2, Refined Storage, Mechanical Crafter do Create, Mekanism, Energized Power...
+- Grades de craft de outros mods (terminal do AE2, grid do Refined Storage, upgrade de craft das mochilas...)
+
+Ou seja: **itens de mod só podem ser feitos pelo dono da patente, na bancada ou no inventário.**
+Desligue com `"autocraft_bloqueia_itens_de_mod": false` (o nome antigo `crafter_bloqueia_itens_de_mod` ainda funciona).
+
+### Create
+O Create também transforma receitas de craft em receitas de Mixer e Prensa, e isso não passa pela bancada.
+Para fechar essa brecha, no `serverconfig/create-server.toml` do mundo, seção `[recipes]`:
+```toml
+allowShapelessInMixer = false
+allowShapedSquareInPress = false
+```
 
 ## Desenvolvimento
+### Auditoria com o seu modpack
+Copie os `.jar` do seu modpack para `build/minecraft-junit/mods/` e rode `./gradlew test`.
+O `PackAuditTest` sobe um servidor com esses mods, monta **toda** receita de craft como se fosse
+um autocrafter e lista as que escapam do bloqueio, agrupadas pela classe da receita.
+Mods com receitas próprias entram em `ModRecipeResultMixin`. Sem mods na pasta, a auditoria é pulada.
+
 A logo é gerada por `python art/make_logo.py` (precisa do Pillow).
 
 ```

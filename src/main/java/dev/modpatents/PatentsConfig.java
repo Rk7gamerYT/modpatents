@@ -39,9 +39,13 @@ public final class PatentsConfig {
     @SerializedName("ignoram_bloqueio")
     public List<String> bypass = new ArrayList<>();
 
-    /** Se true, o Crafter (autocraft do vanilla) só faz itens que estão em sempre_liberados. */
-    @SerializedName("crafter_bloqueia_itens_de_mod")
-    public boolean crafterBlocksModItems = true;
+    /**
+     * Se true, qualquer craft que não seja o de um jogador na bancada/inventário (Crafter do vanilla,
+     * autocraft do AE2/Refined Storage/Create/Mekanism, grades de craft de outros mods...)
+     * só faz itens que estão em sempre_liberados.
+     */
+    @SerializedName(value = "autocraft_bloqueia_itens_de_mod", alternate = "crafter_bloqueia_itens_de_mod")
+    public boolean autocraftBlocksModItems = true;
 
     /** {mod} = nome do mod, {item} = nome do item. */
     @SerializedName("mensagem_bloqueio")

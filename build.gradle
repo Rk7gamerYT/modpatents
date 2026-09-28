@@ -205,4 +205,6 @@ dependencies {
 
 tasks.named('test', Test) {
     useJUnitPlatform()
+    // a auditoria (PackAuditTest) pode carregar um modpack inteiro
+    maxHeapSize = '6G'
 }
