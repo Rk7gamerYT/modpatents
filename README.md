@@ -27,12 +27,18 @@ Feito para séries de Minecraft em que cada jogador tem a **patente** de alguns 
   "ignoram_bloqueio": ["NomeDoAdmin"],
   "autocraft_bloqueia_itens_de_mod": true,
   "mensagem_bloqueio": "Você não tem permissão pra craftar itens de {mod}!",
+  "requisitos_proficiência": {
+    "create:mechanical_press": {"crafting": 2},
+    "create:mechanical_mixer": {"crafting": 2}
+  },
+  "mensagem_proficiência": "Você precisa de proficiência ({requisitos}) para craftar {item}.",
   "jogadores": {
     "Kaua":    ["create*"],
     "Player2": ["mekanism*"]
   }
 }
 ```
+Os requisitos PMMO são opcionais e só são verificados depois que a patente permite o craft manual. Use ids de item, padrões ou tags. O número é o nível mínimo; deixe níveis baixos (por exemplo, 2–4) para que a patente continue sendo a parte principal da progressão. O bypass administrativo em `ignoram_bloqueio` ignora os dois bloqueios.
 Cada entrada pode ser:
 | Entrada | Significa |
 |---|---|

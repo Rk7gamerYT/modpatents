@@ -11,8 +11,11 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,12 +37,14 @@ public final class CraftRules {
     private static CraftRules current = new CraftRules(new PatentsConfig());
     private static boolean lastLoadFailed = false;
     private static final Map<UUID, Long> lastMessageAt = new HashMap<>();
+    private static boolean pmmoWarningLogged = false;
     /** Jogador cujo craft na bancada/inventário está sendo processado agora (os mixins dos menus cuidam dele). */
     private static final ThreadLocal<Player> playerCraft = new ThreadLocal<>();
 
     private final PatentsConfig config;
     private final List<Predicate<ItemStack>> alwaysAllowed;
     private final List<Predicate<ItemStack>> blockedForAll;
+    private final List<ProficiencyRule> proficiencyRequirements;
     private final Set<String> bypass = new HashSet<>();
     /** Chave: nome em minúsculas ou UUID. */
     private final Map<String, List<Predicate<ItemStack>>> perPlayer = new HashMap<>();
@@ -48,6 +53,7 @@ public final class CraftRules {
         this.config = config;
         this.alwaysAllowed = compileAll(config.alwaysAllowed);
         this.blockedForAll = compileAll(config.blockedForAll);
+        this.proficiencyRequirements = compileProficiencies(config.proficiencyRequirements);
         config.bypass.forEach(name -> bypass.add(normalize(name)));
         config.players.forEach((name, entries) -> perPlayer.put(normalize(name), compileAll(entries)));
     }
@@ -123,10 +129,21 @@ public final class CraftRules {
         if (!(player instanceof ServerPlayer serverPlayer) || result.isEmpty()) {
             return result;
         }
-        if (canCraft(serverPlayer.getGameProfile().getName(), serverPlayer.getUUID(), result)) {
-            return result;
+        if (!canCraft(serverPlayer.getGameProfile().getName(), serverPlayer.getUUID(), result)) {
+            notifyBlocked(serverPlayer, result);
+            return ItemStack.EMPTY;
         }
-        notifyBlocked(serverPlayer, result);
+
+        CraftRules rules = current;
+        String name = normalize(serverPlayer.getGameProfile().getName());
+        String id = serverPlayer.getUUID().toString();
+        // The explicit admin bypass retains its original meaning and skips both checks.
+        if (rules.bypass.contains(name) || rules.bypass.contains(id)) return result;
+
+        Map<String, Long> requirements = rules.proficiencyRequirements(result);
+        if (requirements.isEmpty() || rules.playerMeetsProficiency(serverPlayer, requirements)) return result;
+
+        notifyProficiencyBlocked(serverPlayer, result, requirements);
         return ItemStack.EMPTY;
     }
 
@@ -184,6 +201,41 @@ public final class CraftRules {
                 player.getGameProfile().getName(), BuiltInRegistries.ITEM.getKey(result.getItem()), modName);
     }
 
+    private static void notifyProficiencyBlocked(ServerPlayer player, ItemStack result,
+                                                 Map<String, Long> requirements) {
+        long now = System.currentTimeMillis();
+        Long last = lastMessageAt.get(player.getUUID());
+        if (last != null && now - last < MESSAGE_COOLDOWN_MS) return;
+        lastMessageAt.put(player.getUUID(), now);
+
+        String required = requirements.entrySet().stream()
+                .map(entry -> entry.getKey() + " " + entry.getValue())
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("");
+        String text = current.config.proficiencyBlockedMessage
+                .replace("{requisitos}", required)
+                .replace("{item}", result.getHoverName().getString());
+        player.displayClientMessage(Component.literal(text).withStyle(ChatFormatting.GOLD), true);
+    }
+
+    /** Ask PMMO to evaluate levels, including any PMMO skill groups configured by the pack. */
+    private boolean playerMeetsProficiency(ServerPlayer player, Map<String, Long> requirements) {
+        if (!ModList.get().isLoaded("pmmo")) return false;
+        try {
+            Class<?> coreClass = Class.forName("harmonised.pmmo.core.Core");
+            Method getCore = coreClass.getMethod("get", Level.class);
+            Object core = getCore.invoke(null, player.level());
+            Method check = coreClass.getMethod("doesPlayerMeetReq", java.util.UUID.class, Map.class);
+            return Boolean.TRUE.equals(check.invoke(core, player.getUUID(), requirements));
+        } catch (ReflectiveOperationException | LinkageError e) {
+            if (!pmmoWarningLogged) {
+                pmmoWarningLogged = true;
+                ModPatents.LOGGER.error("[ModPatents] Não consegui consultar os requisitos do PMMO; crafts com proficiência ficam bloqueados.", e);
+            }
+            return false;
+        }
+    }
+
     // ---------------------------------------------------------------- compilação das entradas
 
     private static boolean matchesAny(List<Predicate<ItemStack>> predicates, ItemStack stack) {
@@ -205,6 +257,35 @@ public final class CraftRules {
         }
         return out;
     }
+
+    private static List<ProficiencyRule> compileProficiencies(Map<String, Map<String, Long>> entries) {
+        List<ProficiencyRule> out = new ArrayList<>();
+        if (entries == null) return out;
+        entries.forEach((itemPattern, skills) -> {
+            Predicate<ItemStack> matcher = compile(itemPattern);
+            if (matcher == null || skills == null || skills.isEmpty()) return;
+            Map<String, Long> requirements = new HashMap<>();
+            skills.forEach((skill, level) -> {
+                if (skill != null && !skill.isBlank() && level != null && level > 0) {
+                    requirements.merge(skill.trim(), level, Math::max);
+                }
+            });
+            if (!requirements.isEmpty()) out.add(new ProficiencyRule(matcher, Map.copyOf(requirements)));
+        });
+        return out;
+    }
+
+    private Map<String, Long> proficiencyRequirements(ItemStack stack) {
+        Map<String, Long> requirements = new HashMap<>();
+        for (ProficiencyRule rule : proficiencyRequirements) {
+            if (rule.matcher().test(stack)) {
+                rule.requirements().forEach((skill, level) -> requirements.merge(skill, level, Math::max));
+            }
+        }
+        return requirements;
+    }
+
+    private record ProficiencyRule(Predicate<ItemStack> matcher, Map<String, Long> requirements) {}
 
     private static Predicate<ItemStack> compile(String raw) {
         if (raw == null || raw.isBlank()) {

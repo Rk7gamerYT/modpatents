@@ -54,6 +54,16 @@ public final class PatentsConfig {
     @SerializedName("jogadores")
     public Map<String, List<String>> players = new LinkedHashMap<>();
 
+    /**
+     * Requisitos PMMO opcionais por item, namespace, wildcard ou tag.
+     * Só são avaliados depois que a patente autoriza o craft manual.
+     */
+    @SerializedName("requisitos_proficiência")
+    public Map<String, Map<String, Long>> proficiencyRequirements = new LinkedHashMap<>();
+
+    @SerializedName("mensagem_proficiência")
+    public String proficiencyBlockedMessage = "Você precisa de proficiência ({requisitos}) para craftar {item}.";
+
     public static Path path() {
         return FMLPaths.CONFIGDIR.get().resolve("modpatents.json");
     }
@@ -98,7 +108,10 @@ public final class PatentsConfig {
         if (bypass == null) bypass = new ArrayList<>();
         if (blockedMessage == null) blockedMessage = new PatentsConfig().blockedMessage;
         if (players == null) players = new LinkedHashMap<>();
+        if (proficiencyRequirements == null) proficiencyRequirements = new LinkedHashMap<>();
+        if (proficiencyBlockedMessage == null) proficiencyBlockedMessage = new PatentsConfig().proficiencyBlockedMessage;
         players.replaceAll((name, entries) -> entries == null ? new ArrayList<>() : new ArrayList<>(entries));
+        proficiencyRequirements.replaceAll((item, requirements) -> requirements == null ? new LinkedHashMap<>() : new LinkedHashMap<>(requirements));
     }
 
     /**
